@@ -1,14 +1,16 @@
-import { HexPrototype } from '../hex'
-import { rectangle, RectangleOptions } from './functions'
+import { DefaultHexPrototype } from '../hex'
+import { rectangle } from './functions'
+import { TraverseOptions } from './types'
 
-export class Grid {
-  static create(hexPrototype: HexPrototype) {
-    return new this(hexPrototype)
+export class Grid<T extends DefaultHexPrototype> {
+  // todo: make traverser optional (and use a default traverser)?
+  constructor(public hexPrototype: T, public traverser: () => Generator<T, void>) {}
+
+  [Symbol.iterator]() {
+    return this.traverser()
   }
 
-  constructor(public hexPrototype: HexPrototype) {}
-
-  rectangle(options: RectangleOptions) {
+  rectangle(options: TraverseOptions<T>) {
     return rectangle(this.hexPrototype, options)
   }
 }

@@ -114,40 +114,79 @@ All existing JS hex grid libraries I could find are coupled with some form of vi
 
 ### Grid
 
-- [ ] Do something with this: [https://www.redblobgames.com/grids/hexagons/#map-storage](https://www.redblobgames.com/grids/hexagons/#map-storage)?
-- [ ] There's a function to create a `traverser`: a [generator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*) that determines how to traverse a grid. It's called with a start direction and returns a [Generator object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Generator):
-  ```ts
-  const hexPrototype = createHexPrototype({ size: 10, orientation: 'flat' })
+#### Terminology
 
-  // using separate functions:
-  const rectange = createTraverser((hexPrototype, direction = 'E') => {
-    // some logic that determines when to change direction (and when to stop?)
+- *grid instance*: an object with an iterator that produces (possibly infinite) hexes in a certain order, it has methods like:
+  - `pipe()`: accepts *operators* to transform hexes:
+    - [ ] `over()`: accepts a *grid-like* and returns a *grid instance* with hexes in the *grid-like* (todo: is this relevant?)
+    - `add()` / `union()`: merges the instance with the passed grid(s)
+    - `subtract()`: removes hexes from the instance where the passed grid(s) overlap
+    - `intersect()`: removes all hexes from the instance except where the instance and passed grid(s) overlap
+    - `difference()`: removes no hexes from the instance except where the instance and passed grid(s) overlap
+    - `tap()`
+    - `filter()`
+    - [ ] `map()` todo: this can return anything, is that a problem?
+  - `toArray()`
+  - `toJSON()`
+  - `toString()`
+  - `map()`
+  - [ ] `mergeMap()` / `flatMap()` todo: is this relevant?
+  - `reduce()`
+  - `find()` / `first()`
+  - `some()` / `contains()` / `has()`
+  - `every()`
+  - [ ] `lift()`? todo: https://rxjs.dev/api/index/class/Observable#lift
+  - [ ] todo: move some of these methods to separate project and/or use existing project (ramda, lodash)?
+- *concrete grid*: a grid instance with finite hexes stored as any data type (array, object, string, etc)
+- *grid-like*: an iterable that can be converted to a grid instance
+- [ ] todo: `new Grid(gridLike)` and `Grid.from(gridLike)` would try to convert a grid-like to a grid instance?
+
+- [ ] Define hex prototype -> define grid with hex prototype -> (optional: create iterable to traverse grid) -> use (existing) iterable to either create a concrete grid (stored in memory) or traverse an existing (concrete) grid (for mapping/reducing/filtering).
+  ```ts
+  const hexPrototype = createHexPrototype()
+  const Grid = defineGrid(hexPrototype)
+
+  // creating grids (these return "traversers" using a [Symbol.iterator] property)
+  const rectangle = Grid.rectangle({ width: 6, height: 4 })
+  const ring = Grid.ring({ radius: 2 })
+  const traverse = Grid.createTraverser(function* (hexPrototype, arg1, arg2) {
+    // yield hexes
   })
-  // this returns a Generator object
-  const grid = rectangle(hexPrototype, /* todo: determine args */)
+  // generator gets called internally like so: (...args) => generator(hexPrototype, ...args)
+  const hexes = traverse('arg1', 'arg2')
+
+  // creating concrete grids
+  const array = rectangle.toArray()
+  const customArray = rectangle.reduce((acc, hex) => acc.concat(hex), [] as Hex[])
+  // todo: should the following be a built-in thing?
+  interface CustomGrid {
+    [coordinates: string]: Hex
+    hexes: Hex[]
+  }
+  const obj = rectangle.reduce((acc, hex) => {
+    acc[hex] = hex
+    acc.hexes.push(hex)
+    return acc
+  }, { hexes: [] } as CustomGrid)
+
+  // converting concrete grids to "virtual" grids
+  // accepts any iterable (so also Grid iterables):
+  const virtualGrid1 = Grid.from(array)
+  // traverser can also be used:
+  const virtualGrid2 = traverse('arg1', 'arg2').over(array) // todo: consider
+
+  // combining grids
+  rectangle.over(array) // todo: consider
+  rectangle.union(obj)
+  rectangle.difference(ring)
   ```
   - [x] ~~these generators produce infinite grids, how to signal boundaries?~~ Traversers accept an optional width or height and/or a `stop()` predicate function that signal when to return from the generator.
-  - [ ] Problem: generators can't be "reused" once `done`.
-- [ ] `Grid` has built-in traversers to create grids in a certain shape (rectangle, triangle, ring, etc.)?
-  ```ts
-  const Grid = defineGrid(hexPrototype)
-  const grid = Grid.rectangle({ width: 10, height: 10, direction: 'E' })
-  ```
-- [ ] Using generators it's up to the user how to store grids (make them concrete):
-  ```ts
-  // as an array:
-  const array = [...grid]
-  // as a set:
-  const set = new Set(grid)
-  // as an object (or whatever else):
-  reduce(grid, (acc, hex, i) => {
-    acc[i] = hex
-    return acc
-  }, {})
-  ```
-- [ ] It's also possible to traverse concrete grids (arrays, sets, etc.):
-  ```ts
-  // array is some concrete grid
-  Grid.from(array).rectangle({ /* options */ }) // or: new Grid(array)
-  ```
+  - [x] Problem: generators can't be "reused" once `done`.
+- [ ] Do something with this: [https://www.redblobgames.com/grids/hexagons/#map-storage](https://www.redblobgames.com/grids/hexagons/#map-storage)?
 - [ ] There should be a way to loop over hexes in a grid with **transducers**?
+- [ ] Do something with matrices?
+
+### General
+
+- [ ] remove "hex" from functions in hex folder (e.g. `createHex()` plainly becomes `create()`)?
+- [ ] Add functionality related to [egdes](https://github.com/flauwekeul/honeycomb/issues/58#issuecomment-642099947)

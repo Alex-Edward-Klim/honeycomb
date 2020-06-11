@@ -1,15 +1,7 @@
-import { createHex, CubeCoordinates, HexPrototype, isPointy } from '../../hex'
-import { offsetFromZero, signedModulo } from '../../utils'
-import { FlatCompassDirection, PointyCompassDirection } from '../types'
-
-export type RectangleDirection = PointyCompassDirection.E | FlatCompassDirection.S
-
-export interface RectangleOptions {
-  width: number
-  height: number
-  start?: CubeCoordinates
-  direction?: RectangleDirection
-}
+import { createHex, CubeCoordinates, DefaultHexPrototype, equals, Hex, isPointy, Orientation } from '../../hex'
+import { isFunction, offsetFromZero } from '../../utils'
+import { Grid } from '../grid'
+import { FlatCompassDirection, PointyCompassDirection, TraverseOptions } from '../types'
 
 const DIRECTIONS = [
   ['q', 'r', 's'],
@@ -20,32 +12,44 @@ const DIRECTIONS = [
   ['q', 's', 'r'],
 ] as [keyof CubeCoordinates, keyof CubeCoordinates, keyof CubeCoordinates][]
 
-export function* rectangle(
-  hexPrototype: HexPrototype,
+// todo: see if some sort of general traverse function can be extracted from this
+export const rectangle = <T extends DefaultHexPrototype>(
+  hexPrototype: T,
   {
-    width,
-    height,
+    direction = hexPrototype.orientation === Orientation.POINTY ? PointyCompassDirection.E : FlatCompassDirection.S,
     start = { q: 0, r: 0, s: 0 },
-    direction = isPointy(hexPrototype) ? PointyCompassDirection.E : FlatCompassDirection.S,
-  }: RectangleOptions,
-) {
-  if (direction < 0 || direction > 5) {
-    direction = signedModulo(direction, 6)
-  }
+    stop = () => false,
+    width = Infinity,
+    height = Infinity,
+  } = {} as TraverseOptions<T>,
+) => {
+  const traverser = function* hexes() {
+    // todo: add warning about infinite loop when width and height are Infinity and stop() never returns true
+    stop = isFunction(stop) ? stop : (hex: T & Hex) => equals(hex, stop as CubeCoordinates)
 
-  const [firstCoordinate, secondCoordinate, thirdCoordinate] = DIRECTIONS[direction]
-  const [firstStop, secondStop] = isPointy(hexPrototype) ? [width, height] : [height, width]
+    // todo: assert unambiguous directions
+    const [firstCoordinate, secondCoordinate, thirdCoordinate] = DIRECTIONS[direction]
+    const [firstStop, secondStop] = isPointy(hexPrototype) ? [width, height] : [height, width]
 
-  for (let second = 0; second < secondStop; second++) {
-    const secondOffset = offsetFromZero(hexPrototype.offset, second)
+    for (let second = 0; second < secondStop; second++) {
+      const secondOffset = offsetFromZero(hexPrototype.offset, second)
 
-    for (let first = -secondOffset; first < firstStop - secondOffset; first++) {
-      const nextCubeCoordinates = {
-        [firstCoordinate]: first + start[firstCoordinate],
-        [secondCoordinate]: second + start[secondCoordinate],
-        [thirdCoordinate]: -first - second + start[thirdCoordinate],
-      } as unknown
-      yield createHex(hexPrototype, nextCubeCoordinates as CubeCoordinates)
+      for (let first = -secondOffset; first < firstStop - secondOffset; first++) {
+        const nextCubeCoordinates = {
+          [firstCoordinate]: first + start[firstCoordinate],
+          [secondCoordinate]: second + start[secondCoordinate],
+          [thirdCoordinate]: -first - second + start[thirdCoordinate],
+        } as unknown
+        const nextHex = createHex(hexPrototype, nextCubeCoordinates as CubeCoordinates)
+
+        if (stop(nextHex)) {
+          return
+        }
+
+        yield nextHex
+      }
     }
   }
+
+  return new Grid(hexPrototype, traverser)
 }
